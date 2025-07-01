@@ -43,7 +43,7 @@ survey_detail_response_model = api.model('SurveyDetailResponse', {
     'options': fields.List(fields.Nested(survey_option_model), description='Survey options')
 })
 
-@survey_bp.before_app_first_request
+@survey_bp.before_request
 def log_routes():
     for rule in current_app.url_map.iter_rules():
         current_app.logger.info(f"Route: {rule.endpoint} -> {rule}")
