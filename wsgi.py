@@ -17,11 +17,8 @@ for root, dirs, files in os.walk(current_dir):
         if dir_path not in sys.path:
             sys.path.insert(0, dir_path)
 
-# Import the Flask app - exactement comme dans app.py
-from app import app
-
-# Cette variable 'app' est exactement la même que celle créée dans app.py
-# Elle contient toute la configuration, les blueprints, les routes, etc.
+# Import the Flask app from application.py to avoid conflict with gunicorn.app
+from application import app
 
 if __name__ == "__main__":
     # Pour le développement local
