@@ -5,16 +5,15 @@ from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from Models.page_visit import PageVisit
-from Models.referral import Referral
 from config import config
 from extensions import db, ma, jwt, migrate
 
 # Importation des modèles
-from Survey.models import Survey, SurveyOption, SurveyResponse
-from Faq.models import FAQ
-from Resultat.models import ResultatCriteria, ResultatTotal, ResultatPoint, ClientRecompense
+from Models.mywitti_survey import MyWittiSurvey, MyWittiSurveyOption, MyWittiSurveyResponse
+from Models.mywitti_faq import MyWittiFAQ
+from Models.mywitti_resultat import MyWittiResultatCriteria, MyWittiResultatTotal, MyWittiResultatPoint, MyWittiClientRecompense
 from Models.token_blacklist import TokenBlacklist
-from Support.models import SupportRequest
+from Models.mywitti_support_request import MyWittiSupportRequest
 from Models.mywitti_users import MyWittiUser
 from Models.mywitti_user_type import MyWittiUserType
 from Models.mywitti_client import MyWittiClient
@@ -26,6 +25,10 @@ from Models.mywitti_jetons_transactions import MyWittiJetonsTransactions
 from Models.mywitti_client_palier_history import MyWittiClientPalierHistory
 from Models.mywitti_client_jetons_daily import MyWittiClientJetonsDaily
 from Models.mywitti_category import MyWittiCategory
+from Models.mywitti_referral import MyWittiReferral
+from Models.mywitti_faq import MyWittiFAQ
+from Models.mywitti_support_request import MyWittiSupportRequest
+from Models.mywitti_advertisement import MyWittiAdvertisement
 
 @jwt.token_in_blocklist_loader
 def check_if_token_is_revoked(jwt_header, jwt_payload):
@@ -73,6 +76,7 @@ def create_app(config_name=None):
     from Faq.views import faq_bp
     from Support.views import support_bp
     from Survey.views import survey_bp
+    from Advertisement.views import advertisement_bp
 
     # Enregistrement des blueprints
     app.register_blueprint(accounts_bp, url_prefix='/accounts')
@@ -82,6 +86,7 @@ def create_app(config_name=None):
     app.register_blueprint(faq_bp, url_prefix='/faq')
     app.register_blueprint(support_bp, url_prefix='/support')
     app.register_blueprint(survey_bp, url_prefix='/survey')
+    app.register_blueprint(advertisement_bp, url_prefix='/advertisement')
 
     # Route pour servir les images
     @app.route('/static/uploads/<path:filename>')

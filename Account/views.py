@@ -4,7 +4,6 @@ from flask import Blueprint, request, current_app
 from flask_restx import Api, Resource, fields
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from werkzeug.security import check_password_hash
-from Models.referral import Referral
 from extensions import db
 from Models.mywitti_users import MyWittiUser
 from Models.mywitti_client import MyWittiClient

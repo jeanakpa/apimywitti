@@ -3,7 +3,7 @@ from flask import request
 from flask_restx import Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from Models.mywitti_users import MyWittiUser
-from Survey.models import Survey, SurveyOption, SurveyResponse
+from Models.mywitti_survey import MyWittiSurvey, MyWittiSurveyOption, MyWittiSurveyResponse
 from Models.mywitti_client import MyWittiClient
 from extensions import db
 from Admin.views import api
@@ -23,7 +23,11 @@ survey_model = api.model('Survey', {
 survey_input_model = api.model('SurveyInput', {
     'title': fields.String(required=True, description='Survey title'),
     'description': fields.String(description='Survey description'),
-    'is_active': fields.Boolean(description='Is survey active?', default=True)
+    'is_active': fields.Boolean(description='Is survey active?', default=True),
+    'custom_options': fields.List(fields.Nested(api.model('CustomOption', {
+        'option_text': fields.String(required=True, description='Option text'),
+        'option_value': fields.Integer(required=True, description='Option value')
+    })), description='Options personnalisées (optionnel)')
 })
 
 survey_response_model = api.model('SurveyResponse', {
@@ -58,17 +62,36 @@ class AdminSurveys(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not admin.is_superuser:
             api.abort(403, "Seuls les super admins peuvent créer des sondages")
+        
         data = request.get_json()
-        survey = Survey(title=data['title'], description=data.get('description'), is_active=data.get('is_active', True))
+        survey = MyWittiSurvey(
+            title=data['title'], 
+            description=data.get('description'), 
+            is_active=data.get('is_active', True)
+        )
         db.session.add(survey)
         db.session.commit()
-        options = [
-            SurveyOption(survey_id=survey.id, option_text="Très mal", option_value=1),
-            SurveyOption(survey_id=survey.id, option_text="Mal", option_value=2),
-            SurveyOption(survey_id=survey.id, option_text="Moyen", option_value=3),
-            SurveyOption(survey_id=survey.id, option_text="Bien", option_value=4),
-            SurveyOption(survey_id=survey.id, option_text="Très bien", option_value=5)
-        ]
+        
+        # Utiliser les options personnalisées si fournies, sinon utiliser les options par défaut
+        if data.get('custom_options') and len(data['custom_options']) > 0:
+            options = []
+            for opt_data in data['custom_options']:
+                option = MyWittiSurveyOption(
+                    survey_id=survey.id, 
+                    option_text=opt_data['option_text'], 
+                    option_value=opt_data['option_value']
+                )
+                options.append(option)
+        else:
+            # Options par défaut
+            options = [
+                MyWittiSurveyOption(survey_id=survey.id, option_text="Très mal", option_value=1),
+                MyWittiSurveyOption(survey_id=survey.id, option_text="Mal", option_value=2),
+                MyWittiSurveyOption(survey_id=survey.id, option_text="Moyen", option_value=3),
+                MyWittiSurveyOption(survey_id=survey.id, option_text="Bien", option_value=4),
+                MyWittiSurveyOption(survey_id=survey.id, option_text="Très bien", option_value=5)
+            ]
+        
         db.session.add_all(options)
         db.session.commit()
         return {"msg": "Sondage créé avec succès", "survey_id": survey.id}, 201
@@ -80,10 +103,10 @@ class AdminSurveys(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not (admin.is_admin or admin.is_superuser):
             api.abort(403, "Utilisateur non autorisé")
-        surveys = Survey.query.all()
+        surveys = MyWittiSurvey.query.all()
         surveys_data = []
         for survey in surveys:
-            options = SurveyOption.query.filter_by(survey_id=survey.id).all()
+            options = MyWittiSurveyOption.query.filter_by(survey_id=survey.id).all()
             surveys_data.append({
                 'id': survey.id,
                 'title': survey.title,
@@ -102,7 +125,7 @@ class AdminSurvey(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not admin.is_superuser:
             api.abort(403, "Seuls les super admins peuvent modifier des sondages")
-        survey = Survey.query.get(survey_id)
+        survey = MyWittiSurvey.query.get(survey_id)
         if not survey:
             api.abort(404, "Sondage non trouvé")
         data = request.get_json()
@@ -119,11 +142,11 @@ class AdminSurvey(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not admin.is_superuser:
             api.abort(403, "Seuls les super admins peuvent supprimer des sondages")
-        survey = Survey.query.get(survey_id)
+        survey = MyWittiSurvey.query.get(survey_id)
         if not survey:
             api.abort(404, "Sondage non trouvé")
-        SurveyResponse.query.filter_by(survey_id=survey_id).delete()
-        SurveyOption.query.filter_by(survey_id=survey_id).delete()
+        MyWittiSurveyResponse.query.filter_by(survey_id=survey_id).delete()
+        MyWittiSurveyOption.query.filter_by(survey_id=survey_id).delete()
         db.session.delete(survey)
         db.session.commit()
         return {"msg": "Sondage supprimé avec succès", "survey_id": survey_id}
@@ -136,14 +159,14 @@ class SurveyResults(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not (admin.is_admin or admin.is_superuser):
             api.abort(403, "Utilisateur non autorisé")
-        survey = Survey.query.get(survey_id)
+        survey = MyWittiSurvey.query.get(survey_id)
         if not survey:
             api.abort(404, "Sondage non trouvé")
-        options = SurveyOption.query.filter_by(survey_id=survey_id).all()
-        total_responses = SurveyResponse.query.filter_by(survey_id=survey_id).count()
+        options = MyWittiSurveyOption.query.filter_by(survey_id=survey_id).all()
+        total_responses = MyWittiSurveyResponse.query.filter_by(survey_id=survey_id).count()
         results = []
         for option in options:
-            response_count = SurveyResponse.query.filter_by(survey_id=survey_id, option_id=option.id).count()
+            response_count = MyWittiSurveyResponse.query.filter_by(survey_id=survey_id, option_id=option.id).count()
             percentage = (response_count / total_responses * 100) if total_responses > 0 else 0
             results.append({
                 'option_text': option.option_text,
@@ -161,14 +184,14 @@ class SurveyResponses(Resource):
         admin = MyWittiUser.query.filter_by(user_id=admin_identifiant).first()
         if not admin or not (admin.is_admin or admin.is_superuser):
             api.abort(403, "Utilisateur non autorisé")
-        survey = Survey.query.get(survey_id)
+        survey = MyWittiSurvey.query.get(survey_id)
         if not survey:
             api.abort(404, "Sondage non trouvé")
-        responses = SurveyResponse.query.filter_by(survey_id=survey_id).all()
+        responses = MyWittiSurveyResponse.query.filter_by(survey_id=survey_id).all()
         response_data = []
         for response in responses:
             customer = MyWittiClient.query.get(response.customer_id)
-            option = SurveyOption.query.get(response.option_id)
+            option = MyWittiSurveyOption.query.get(response.option_id)
             response_data.append({
                 'response_id': response.id,
                 'customer_code': customer.customer_code,

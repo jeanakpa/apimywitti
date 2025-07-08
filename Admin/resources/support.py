@@ -2,7 +2,7 @@
 from flask_restx import Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from Models.mywitti_users import MyWittiUser
-from Support.models import SupportRequest
+from Models.mywitti_support_request import MyWittiSupportRequest
 from Admin.views import api
 
 support_request_model = api.model('SupportRequest', {
@@ -23,5 +23,5 @@ class SupportRequestList(Resource):
         user = MyWittiUser.query.filter_by(user_id=user_id).first()
         if not user or not (user.is_admin or user.is_superuser):
             api.abort(403, "Accès interdit")
-        support_requests = SupportRequest.query.all()
+        support_requests = MyWittiSupportRequest.query.all()
         return [request.to_dict() for request in support_requests]

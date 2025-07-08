@@ -36,7 +36,7 @@ def reset_migrations():
             db.session.execute(text("DROP TABLE IF EXISTS mywitti_users"))
             db.session.execute(text("DROP TABLE IF EXISTS mywitti_user_type"))
             db.session.execute(text("DROP TABLE IF EXISTS page_visit"))
-            db.session.execute(text("DROP TABLE IF EXISTS referrals"))
+            db.session.execute(text("DROP TABLE IF EXISTS mywitti_referral"))
             db.session.execute(text("DROP TABLE IF EXISTS token_blacklist"))
             
             db.session.commit()

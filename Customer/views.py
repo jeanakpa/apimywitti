@@ -9,7 +9,7 @@ from Models.mywitti_users import MyWittiUser
 from Models.token_blacklist import TokenBlacklist
 from extensions import db
 from datetime import datetime, timedelta
-from Models.referral import Referral
+from Models.mywitti_referral import MyWittiReferral
 from Models.mywitti_notification import MyWittiNotification
 
 
@@ -411,6 +411,15 @@ invite_model = api.model('Invite', {
     'email': fields.String(required=True, description='Email de l\'ami à inviter')
 })
 
+# Modèle pour la liste des parrainages
+referrals_list_model = api.model('ReferralsList', {
+    'referrals': fields.List(fields.Nested(referral_model), description='Liste des parrainages'),
+    'total_referrals': fields.Integer(description='Nombre total de parrainages'),
+    'pending_count': fields.Integer(description='Nombre de parrainages en attente'),
+    'accepted_count': fields.Integer(description='Nombre de parrainages acceptés'),
+    'rewarded_count': fields.Integer(description='Nombre de parrainages récompensés')
+})
+
 class InviteResource(Resource):
     @jwt_required()
     @api.expect(invite_model)
@@ -433,13 +442,13 @@ class InviteResource(Resource):
                 return {'message': 'Format d\'email invalide'}, 400
 
             # Vérification si l'email existe déjà dans les parrainages
-            existing_referral = Referral.query.filter_by(referred_email=email).first()
+            existing_referral = MyWittiReferral.query.filter_by(referred_email=email).first()
             if existing_referral:
                 return {'message': 'Cet email a déjà été invité'}, 400
 
             # Création sécurisée d'un nouveau parrainage
             referral_code = str(uuid.uuid4())
-            referral = Referral(
+            referral = MyWittiReferral(
                 referrer_id=user.id,
                 referred_email=email,
                 referral_code=referral_code,
@@ -459,4 +468,53 @@ class InviteResource(Resource):
             db.session.rollback()
             return {"error": "Internal server error"}, 500
 
+class MyReferralsResource(Resource):
+    @jwt_required()
+    @api.marshal_with(referrals_list_model)
+    def get(self):
+        try:
+            # Récupération sécurisée de l'utilisateur connecté
+            identifiant = get_jwt_identity()
+            user = MyWittiUser.query.filter_by(user_id=identifiant).first()
+            if not user:
+                return {'message': 'Utilisateur non trouvé'}, 404
+
+            # Récupération sécurisée des parrainages de l'utilisateur
+            referrals = MyWittiReferral.query.filter_by(referrer_id=user.id).order_by(MyWittiReferral.created_at.desc()).all()
+            
+            referrals_data = []
+            pending_count = 0
+            accepted_count = 0
+            rewarded_count = 0
+            
+            for referral in referrals:
+                # Compter les statuts
+                if referral.status == 'pending':
+                    pending_count += 1
+                elif referral.status == 'accepted':
+                    accepted_count += 1
+                elif referral.status == 'rewarded':
+                    rewarded_count += 1
+                
+                referral_data = {
+                    'referral_link': f"http://127.0.0.1:5000/accounts/refer/{referral.referral_code}",
+                    'referred_email': referral.referred_email,
+                    'status': referral.status,
+                    'created_at': referral.created_at.isoformat() if referral.created_at else None
+                }
+                referrals_data.append(referral_data)
+
+            return {
+                'referrals': referrals_data,
+                'total_referrals': len(referrals_data),
+                'pending_count': pending_count,
+                'accepted_count': accepted_count,
+                'rewarded_count': rewarded_count
+            }, 200
+
+        except Exception as e:
+            current_app.logger.error(f"Error fetching referrals: {str(e)}")
+            return {"error": "Internal server error"}, 500
+
 api.add_resource(InviteResource, '/invite')
+api.add_resource(MyReferralsResource, '/my-referrals')

@@ -312,6 +312,51 @@ class ViewCart(Resource):
             current_app.logger.error(f"Error viewing cart: {str(e)}")
             return {"error": "Internal server error"}, 500
 
+@api.route('/cart/<int:item_id>', methods=['DELETE'])
+class RemoveFromCart(Resource):
+    @jwt_required()
+    def delete(self, item_id):
+        """Supprimer un article du panier"""
+        try:
+            # Récupération sécurisée de l'utilisateur
+            user_id = get_jwt_identity()
+            user = MyWittiUser.query.filter_by(user_id=user_id).first()
+            if not user:
+                return {"message": "Utilisateur non trouvé"}, 404
+
+            # Récupération sécurisée du client associé à l'utilisateur
+            customer = MyWittiClient.query.filter_by(user_id=user.id).first()
+            if not customer:
+                return {"message": "Client non trouvé"}, 404
+
+            # Récupération sécurisée de l'article du panier
+            cart_item = MyWittiLotsClaims.query.filter_by(
+                id=item_id,
+                client_id=customer.id,
+                statut='cart'
+            ).first()
+            
+            if not cart_item:
+                return {"message": "Article non trouvé dans le panier"}, 404
+
+            # Récupération des informations de la récompense pour le message
+            reward = MyWittiLot.query.get(cart_item.lot_id)
+            reward_name = reward.libelle if reward else "Article"
+
+            # Suppression sécurisée de l'article du panier
+            db.session.delete(cart_item)
+            db.session.commit()
+
+            return {
+                "msg": f"{reward_name} supprimé du panier",
+                "item_id": item_id
+            }, 200
+
+        except Exception as e:
+            current_app.logger.error(f"Error removing from cart: {str(e)}")
+            db.session.rollback()
+            return {"error": "Internal server error"}, 500
+
 @api.route('/place-order', methods=['POST'])
 class PlaceOrder(Resource):
     @jwt_required()
@@ -358,21 +403,22 @@ class PlaceOrder(Resource):
                     "image_url": reward.recompense_image or ""
                 })
 
-                # Mise à jour du statut de l'article à 'pending'
+                # Mise à jour du statut de l'article à 'pending' (pas de débit immédiat)
                 item.statut = 'pending'
 
-            # Vérification sécurisée des jetons disponibles
+            # Vérification sécurisée des jetons disponibles (pour validation future)
             if customer.jetons < total_amount:
-                return {"message": "Jetons insuffisants"}, 400
+                return {"message": "Jetons insuffisants pour cette commande"}, 400
 
-            # Déduction sécurisée des jetons
-            customer.jetons -= total_amount
+            # IMPORTANT: NE PAS DÉDUIRE LES JETONS ICI - ils seront déduits lors de la validation admin
+            # customer.jetons -= total_amount  # ← LIGNE SUPPRIMÉE
+            
             db.session.commit()
 
-            # Création sécurisée de la notification
+            # Création sécurisée de la notification pour informer de l'attente
             notification = MyWittiNotification(
                 user_id=user.id,
-                message=f"Commande passée avec succès pour {total_amount} jetons (en attente de validation)."
+                message=f"Votre commande de {total_amount} jetons a été enregistrée et est en attente de validation par l'administrateur."
             )
             db.session.add(notification)
             db.session.commit()

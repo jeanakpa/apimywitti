@@ -2,7 +2,7 @@ from flask import Blueprint
 from flask_restx import Api, Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
-from Faq.models import FAQ
+from Models.mywitti_faq import MyWittiFAQ
 
 faq_bp = Blueprint('faq', __name__, url_prefix='/faq')
 api = Api(faq_bp, version='1.0', title='FAQ API', description='API for FAQ operations')
@@ -24,7 +24,7 @@ class FAQList(Resource):
     @jwt_required()
     @api.marshal_with(faq_response_model)
     def get(self):
-        faqs = FAQ.query.all()
+        faqs = MyWittiFAQ.query.all()
         faqs_data = [{
             "id": faq.id,
             "question": faq.question,

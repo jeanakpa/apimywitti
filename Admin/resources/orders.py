@@ -7,6 +7,7 @@ from Models.mywitti_lots_favoris import MyWittiLotsFavoris
 from Models.mywitti_lots_claims import MyWittiLotsClaims
 from Models.mywitti_client import MyWittiClient
 from Models.mywitti_notification import MyWittiNotification
+from Models.mywitti_comptes import MyWittiCompte
 from extensions import db
 from Admin.views import api
 from datetime import datetime
@@ -175,16 +176,20 @@ class ValidateOrder(Resource):
             if customer.jetons < (reward.jetons or 0):
                 return {"msg": "Jetons insuffisants pour le client"}, 400
 
+            # Récupération de l'agence du client
+            compte = MyWittiCompte.query.filter_by(customer_code=customer.customer_code).first()
+            agence_name = compte.agence if compte and compte.agence else "votre agence"
+
             # Validation sécurisée de la commande
             order.statut = 'validated'
-            customer.jetons -= (reward.jetons or 0)
+            customer.jetons -= (reward.jetons or 0)  # Débit des jetons lors de la validation
             # Mise à jour sécurisée du stock
             reward.stock -= 1
             # Création sécurisée des notifications
             customer_name = f"{customer.first_name} {customer.short_name}" if customer.first_name and customer.short_name else "Client"
             notification_user = MyWittiNotification(
                 user_id=customer.user_id,
-                message=f"Votre commande {order.id} de {reward.libelle} a été validée. Passez en agence pour la récupérer."
+                message=f"Votre commande {order.id} de {reward.libelle} a été validée. Passez à l'agence {agence_name} pour la récupérer."
             )
             notification_admin = MyWittiNotification(
                 user_id=admin.id,
@@ -217,12 +222,16 @@ class CancelOrder(Resource):
             if order.statut == 'cancelled':
                 return {"msg": "La commande est déjà annulée"}, 400
 
-            # Annulation sécurisée de la commande
+            # Récupération de la récompense pour le message
+            reward = MyWittiLot.query.get(order.lot_id)
+            reward_name = reward.libelle if reward else "Article"
+
+            # Annulation sécurisée de la commande (pas de débit de jetons)
             order.statut = 'cancelled'
             # Création sécurisée des notifications
             notification_user = MyWittiNotification(
                 user_id=order.client_id,
-                message=f"Votre commande {order.id} a été annulée."
+                message=f"Votre commande {order.id} de {reward_name} a été annulée. Vos jetons n'ont pas été débités."
             )
             notification_admin = MyWittiNotification(
                 user_id=admin.id,
@@ -234,3 +243,9 @@ class CancelOrder(Resource):
         except Exception as e:
             db.session.rollback()
             return {"msg": f"Erreur lors de l'annulation: {str(e)}"}, 500
+
+# Enregistrement des ressources
+api.add_resource(AdminOrders, '/orders')
+api.add_resource(AdminOrderDetail, '/orders/<int:order_id>')
+api.add_resource(ValidateOrder, '/orders/<int:order_id>/validate')
+api.add_resource(CancelOrder, '/orders/<int:order_id>/cancel')

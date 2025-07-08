@@ -2,9 +2,9 @@
 from flask import request
 from flask_restx import Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from Models.mywitti_referral import MyWittiReferral
+from Models.mywitti_support_request import MyWittiSupportRequest
 from Models.mywitti_users import MyWittiUser
-from Models.referral import Referral
-from Support.models import SupportRequest
 from extensions import db
 
 # Définir les modèles sans dépendre de l'api
@@ -17,7 +17,7 @@ referral_model = {
     'referred_email': fields.String(description='Email de l\'ami invité'),
     'referral_link': fields.String(description='Lien de parrainage'),
     'status': fields.String(description='Statut du parrainage'),
-    'created_at': fields.DateTime(description='Date de création')
+    'created_at': fields.String(description='Date de création')
 }
 
 update_status_model = {
@@ -27,79 +27,69 @@ update_status_model = {
 class ReferralManagementResource(Resource):
     @jwt_required()
     def get(self):
-        # Récupérer l'utilisateur connecté
         identifiant = get_jwt_identity()
         admin = MyWittiUser.query.filter_by(user_id=identifiant).first()
         if not admin:
             return {'message': 'Utilisateur non trouvé'}, 404
-
-        # Vérifier si l'utilisateur est un admin ou super admin
         if not (admin.is_admin or admin.is_superuser):
             return {'message': 'Accès réservé aux administrateurs'}, 403
-
-        # Récupérer tous les parrainages
-        referrals = Referral.query.all()
-        referral_data = [{
-            'id': referral.id,
-            'referrer_id': referral.referrer_id,
-            'referrer_email': referral.referrer.email if referral.referrer else 'N/A',
-            'referred_email': referral.referred_email,
-            'referral_link': f"http://127.0.0.1:5000/accounts/refer/{referral.referral_code}",
-            'status': referral.status,
-            'created_at': referral.created_at.isoformat()
-        } for referral in referrals]
-
-        return {
-            'referrals': referral_data
-        }, 200
+        
+        try:
+            referrals = MyWittiReferral.query.all()
+            referral_data = []
+            
+            for referral in referrals:
+                # Vérifier que la relation existe
+                referrer_email = 'N/A'
+                if referral.referrer:
+                    referrer_email = referral.referrer.email
+                
+                referral_data.append({
+                    'id': referral.id,
+                    'referrer_id': referral.referrer_id,
+                    'referrer_email': referrer_email,
+                    'referred_email': referral.referred_email,
+                    'referral_link': f"http://127.0.0.1:5000/accounts/refer/{referral.referral_code}",
+                    'status': referral.status,
+                    'created_at': referral.created_at.isoformat() if referral.created_at else None
+                })
+            
+            return referral_data, 200
+            
+        except Exception as e:
+            print(f"Erreur lors de la récupération des parrainages: {str(e)}")
+            return [], 200
 
     @jwt_required()
     def put(self, referral_id):
-        # Récupérer l'utilisateur connecté
         identifiant = get_jwt_identity()
         admin = MyWittiUser.query.filter_by(user_id=identifiant).first()
         if not admin:
             return {'message': 'Utilisateur non trouvé'}, 404
-
-        # Vérifier si l'utilisateur est un admin ou super admin
         if not (admin.is_admin or admin.is_superuser):
             return {'message': 'Accès réservé aux administrateurs'}, 403
-
-        # Récupérer le parrainage
-        referral = Referral.query.get(referral_id)
+        referral = MyWittiReferral.query.get(referral_id)
         if not referral:
             return {'message': 'Parrainage non trouvé'}, 404
-
-        # Mettre à jour le statut
         data = request.get_json()
         new_status = data.get('status')
-        if new_status not in ['pending', 'accepted', 'rewarded']:
+        if new_status not in ['En cours', 'Accepté', 'Récompensé']:
             return {'message': 'Statut invalide'}, 400
-
         referral.status = new_status
         db.session.commit()
-
         return {'message': 'Statut mis à jour avec succès'}, 200
 
     @jwt_required()
     def delete(self, referral_id):
-        # Récupérer l'utilisateur connecté
         identifiant = get_jwt_identity()
         admin = MyWittiUser.query.filter_by(user_id=identifiant).first()
         if not admin:
             return {'message': 'Utilisateur non trouvé'}, 404
-
-        # Vérifier si l'utilisateur est un admin ou super admin
         if not (admin.is_admin or admin.is_superuser):
             return {'message': 'Accès réservé aux administrateurs'}, 403
-
-        # Récupérer le parrainage
-        referral = Referral.query.get(referral_id)
+        referral = MyWittiReferral.query.get(referral_id)
         if not referral:
             return {'message': 'Parrainage non trouvé'}, 404
-
-        # Supprimer le parrainage
         db.session.delete(referral)
         db.session.commit()
-
         return {'message': 'Parrainage supprimé avec succès'}, 200

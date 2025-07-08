@@ -29,7 +29,7 @@ referral_model_def = referral_ns.model('Referral', referral_model)
 update_status_model_def = referral_ns.model('UpdateStatus', update_status_model)
 
 # Décorer ReferralManagementResource avec les modèles
-ReferralManagementResource.get = referral_ns.marshal_with(referral_model_def, as_list=True, envelope='referrals')(ReferralManagementResource.get)
+ReferralManagementResource.get = referral_ns.marshal_list_with(referral_model_def)(ReferralManagementResource.get)
 ReferralManagementResource.put = referral_ns.expect(update_status_model_def)(ReferralManagementResource.put)
 
 # Importation différée de AdminNotifications et AdminNotificationDetail
