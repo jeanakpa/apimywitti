@@ -61,10 +61,13 @@ python test_gunicorn_start.py
 - `test_simple_import.py` : Test d'import de application.py
 - `test_wsgi_import.py` : Test d'import de wsgi.py
 - `test_gunicorn_start.py` : Test de configuration Gunicorn
+- `test_api_functionality.py` : Test de fonctionnalité de l'API après correction SQLAlchemy
 
 ### Fichiers modifiés
 - `wsgi.py` : Import depuis `application.py` au lieu de `app.py`
 - `TROUBLESHOOTING.md` : Documentation mise à jour
+- `Models/mywitti_survey.py` : Correction du backref `survey_responses` → `basic_survey_responses`
+- `Models/mywitti_survey_enhanced.py` : Correction du backref `survey_responses` → `enhanced_survey_responses`
 
 ### Fichiers inchangés
 - `app.py` : Reste inchangé pour le développement local
@@ -111,6 +114,7 @@ Avec cette solution :
 3. **Tous les blueprints** fonctionnent (9 blueprints)
 4. **Toutes les routes** disponibles (83 routes)
 5. **Déploiement Render** fonctionnel
+6. **Conflit SQLAlchemy résolu** - Relations survey_responses corrigées
 
 ## 🔄 Workflow de développement
 
