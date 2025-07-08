@@ -1,6 +1,8 @@
 # app.py (modifié)
 import logging
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request

@@ -1,6 +1,8 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # application.py (copie de app.py pour éviter le conflit avec gunicorn.app)
 import logging
-import os
 from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
