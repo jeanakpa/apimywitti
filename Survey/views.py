@@ -3,7 +3,7 @@ from flask_restx import Api, Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from Models.mywitti_users import MyWittiUser
 from Models.mywitti_client import MyWittiClient
-from Survey.models import Survey, SurveyOption, SurveyResponse
+from Models.mywitti_survey import MyWittiSurvey, MyWittiSurveyOption, MyWittiSurveyResponse
 from extensions import db
 from datetime import datetime
 
@@ -55,7 +55,7 @@ class SurveyList(Resource):
     def get(self):
         try:
             # Récupération sécurisée des sondages actifs
-            surveys = Survey.query.filter_by(is_active=True).all()
+            surveys = MyWittiSurvey.query.filter_by(is_active=True).all()
             surveys_data = [{
                 'id': survey.id,
                 'title': survey.title or "Sans titre",
@@ -79,8 +79,8 @@ class SurveyDetail(Resource):
     def get(self, survey_id):
         try:
             # Récupération sécurisée du sondage
-            survey = Survey.query.get_or_404(survey_id)
-            options = SurveyOption.query.filter_by(survey_id=survey_id).all()
+            survey = MyWittiSurvey.query.get_or_404(survey_id)
+            options = MyWittiSurveyOption.query.filter_by(survey_id=survey_id).all()
             
             survey_data = {
                 'id': survey.id,
@@ -127,7 +127,7 @@ class SurveyResponse(Resource):
                 return {"message": "Client non trouvé"}, 404
 
             # Vérification que le sondage existe et est actif
-            survey = Survey.query.filter_by(id=survey_id, is_active=True).first()
+            survey = MyWittiSurvey.query.filter_by(id=survey_id, is_active=True).first()
             if not survey:
                 return {"message": "Sondage non trouvé ou inactif"}, 404
             
@@ -148,12 +148,12 @@ class SurveyResponse(Resource):
                 return {"message": "option_id doit être un nombre entier"}, 400
             
             # Vérification que l'option existe pour ce sondage
-            option = SurveyOption.query.filter_by(id=option_id, survey_id=survey_id).first()
+            option = MyWittiSurveyOption.query.filter_by(id=option_id, survey_id=survey_id).first()
             if not option:
                 return {"message": "Option invalide pour ce sondage"}, 400
             
             # Vérification que l'utilisateur n'a pas déjà répondu à ce sondage
-            existing_response = SurveyResponse.query.filter_by(
+            existing_response = MyWittiSurveyResponse.query.filter_by(
                 survey_id=survey_id,
                 user_id=user.id
             ).first()
@@ -163,7 +163,7 @@ class SurveyResponse(Resource):
                 return {"message": "Vous avez déjà répondu à ce sondage"}, 400
 
             # Création sécurisée de la réponse
-            response = SurveyResponse(
+            response = MyWittiSurveyResponse(
                 survey_id=survey_id,
                 user_id=user.id,
                 customer_id=customer.id,

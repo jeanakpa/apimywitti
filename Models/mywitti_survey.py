@@ -34,8 +34,8 @@ class MyWittiSurveyResponse(db.Model):
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     survey = db.relationship('MyWittiSurvey', backref='responses')
     option = db.relationship('MyWittiSurveyOption', backref='responses')
-    user = db.relationship('MyWittiUser', backref='survey_responses')
-    customer = db.relationship('MyWittiClient', backref='survey_responses')
+    user = db.relationship('MyWittiUser', backref='basic_survey_responses')
+    customer = db.relationship('MyWittiClient', backref='basic_survey_responses')
 
     def __repr__(self):
         return f"<SurveyResponse {self.id} - Survey {self.survey_id}>" 
