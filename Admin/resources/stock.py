@@ -5,6 +5,7 @@ from flask_restx import Resource, fields
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from Models.mywitti_users import MyWittiUser
 from Models.mywitti_lots import MyWittiLot
+from Models.mywitti_lots_claims import MyWittiLotsClaims
 from extensions import db
 from datetime import datetime
 from Admin.views import api
@@ -44,7 +45,8 @@ stock_input_model = api.model('StockInput', {
     'libelle': fields.String(required=True, description='Name of the item'),
     'jetons': fields.Integer(required=True, description='Price in Tokens'),
     'stock': fields.Integer(required=True, description='Quantity Available'),
-    'category_id': fields.Integer(description='Category ID')
+    'category_id': fields.Integer(description='Category ID'),
+    'recompense_image_url': fields.String(description='URL of the reward image (alternative to file upload)')
 })
 
 class StockList(Resource):
@@ -107,6 +109,8 @@ class StockList(Resource):
 
             # Gestion sécurisée de l'image (si fournie)
             image_url = None
+            
+            # Priorité 1: Upload de fichier (si fourni)
             if 'image' in request.files:
                 file = request.files['image']
                 if file and file.filename != '':
@@ -122,6 +126,13 @@ class StockList(Resource):
                     file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
                     file.save(file_path)
                     image_url = f"/{file_path}"
+            
+            # Priorité 2: URL de récompense (si fournie et pas d'upload)
+            elif data.get('recompense_image_url'):
+                image_url = data['recompense_image_url']
+                # Validation basique de l'URL
+                if not image_url.startswith(('http://', 'https://')):
+                    api.abort(400, "L'URL de récompense doit commencer par http:// ou https://")
 
             # Création sécurisée du nouveau stock
             new_stock = MyWittiLot(
@@ -208,8 +219,8 @@ class StockDetail(Resource):
                     if not validate_file_size(file):
                         api.abort(400, f"Fichier trop volumineux. Taille maximum: {MAX_FILE_SIZE // (1024*1024)}MB")
 
-                    # Suppression sécurisée de l'ancienne image
-                    if stock.recompense_image:
+                    # Suppression sécurisée de l'ancienne image (seulement si c'est un fichier local)
+                    if stock.recompense_image and stock.recompense_image.startswith('/static/'):
                         old_file_path = stock.recompense_image.lstrip('/')
                         if os.path.exists(old_file_path):
                             try:
@@ -224,6 +235,24 @@ class StockDetail(Resource):
                     file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
                     file.save(file_path)
                     stock.recompense_image = f"/{file_path}"
+            
+            # Mise à jour avec URL de récompense (si fournie)
+            elif data.get('recompense_image_url'):
+                # Suppression sécurisée de l'ancienne image (seulement si c'est un fichier local)
+                if stock.recompense_image and stock.recompense_image.startswith('/static/'):
+                    old_file_path = stock.recompense_image.lstrip('/')
+                    if os.path.exists(old_file_path):
+                        try:
+                            os.remove(old_file_path)
+                        except OSError:
+                            pass  # Ignorer les erreurs de suppression
+                
+                # Validation de l'URL
+                image_url = data['recompense_image_url']
+                if not image_url.startswith(('http://', 'https://')):
+                    api.abort(400, "L'URL de récompense doit commencer par http:// ou https://")
+                
+                stock.recompense_image = image_url
 
             stock.updated_at = datetime.utcnow()
             db.session.commit()
@@ -264,8 +293,8 @@ class StockDetail(Resource):
             if pending_orders > 0:
                 api.abort(400, f"Impossible de supprimer le stock. Il a {pending_orders} commande(s) en attente.")
 
-            # Suppression sécurisée de l'image associée
-            if stock.recompense_image:
+            # Suppression sécurisée de l'image associée (seulement si c'est un fichier local)
+            if stock.recompense_image and stock.recompense_image.startswith('/static/'):
                 file_path = stock.recompense_image.lstrip('/')
                 if os.path.exists(file_path):
                     try:

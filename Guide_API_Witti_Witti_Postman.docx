@@ -21,7 +21,7 @@
 
 ## 🔧 Configuration de base
 
-**URL de base :** `http://127.0.0.1:5000`
+**URL de base :** `http://10.125.30.8`
 
 **Headers communs :**
 ```
@@ -45,7 +45,7 @@ Content-Type: application/json
 **Body (JSON) :**
 ```json
 {
-    "identifiant": "user_test",
+    "identifiant": "123456",
     "password": "123456"
 }
 ```
@@ -58,7 +58,7 @@ Content-Type: application/json
 ```
 
 **Exemple avec données réelles :**
-- **Identifiant :** `user_test`
+- **Identifiant :** `123456`
 - **Mot de passe :** `123456`
 - **Client associé :** User Test (500 jetons, catégorie Executive)
 
